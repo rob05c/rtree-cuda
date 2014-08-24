@@ -13,7 +13,7 @@ void lqt_delete(struct linear_quadtree q) {
 
 /// @param points points to construct a quadtree from. Takes ownership. MUST be dynamically allocated
 /// @return linear quadtree. Caller takes ownership and must call lqt_delete()
-struct linear_quadtree lqt_create(struct lqt_point* points, size_t len, 
+struct linear_quadtree lqt_create(struct rtree_point* points, size_t len, 
              ord_t xstart, ord_t xend, 
              ord_t ystart, ord_t yend,
              size_t* depth) {
@@ -32,7 +32,7 @@ struct linear_quadtree lqt_create(struct lqt_point* points, size_t len,
  *
  * @return a new unsorted linear_quadtree. caller takes ownership, and must call lqt_delete()
  */
-struct linear_quadtree lqt_nodify(struct lqt_point* points, size_t len, 
+struct linear_quadtree lqt_nodify(struct rtree_point* points, size_t len, 
              ord_t xstart, ord_t xend, 
              ord_t ystart, ord_t yend,
              size_t* depth) {
@@ -45,7 +45,7 @@ struct linear_quadtree lqt_nodify(struct lqt_point* points, size_t len,
   lqt.length = len;
 
   for(size_t i = 0, end = len; i != end; ++i) {
-    struct lqt_point* thisPoint = &lqt.points[i];
+    struct rtree_point* thisPoint = &lqt.points[i];
 
     ord_t currentXStart = xstart;
     ord_t currentXEnd = xend;
@@ -70,7 +70,7 @@ struct linear_quadtree lqt_nodify(struct lqt_point* points, size_t len,
 
 struct rs_list_node {
   location_t           location;
-  struct lqt_point     point;
+  struct rtree_point     point;
   struct rs_list_node* next;
 };
 struct rs_list {
@@ -78,7 +78,7 @@ struct rs_list {
   struct rs_list_node* tail;
 };
 /// @todo determine if a location pointer is faster
-void rs_list_insert(struct rs_list* l, const location_t location, const struct lqt_point* point) {
+void rs_list_insert(struct rs_list* l, const location_t location, const struct rtree_point* point) {
   struct rs_list_node* n = (struct rs_list_node*)malloc(sizeof(struct rs_list_node));
   n->location = location;
   n->point    = *point;
@@ -149,7 +149,7 @@ struct linear_quadtree lqt_sortify(struct linear_quadtree lqt) {
  * @param depth the quadtree depth. Necessary, because it indicates
  *              the number of position bit-pairs
  */
-void lqt_print_node(const location_t* location, const struct lqt_point* point, const bool verbose) {
+void lqt_print_node(const location_t* location, const struct rtree_point* point, const bool verbose) {
   if(verbose)
   {
     for(int j = sizeof(location_t) * CHAR_BIT - 1, jend = 0; j >= jend; j -= 2)
@@ -186,8 +186,8 @@ void lqt_copy(struct linear_quadtree* destination, struct linear_quadtree* sourc
   destination->length = source->length;
   destination->locations = (location_t*) malloc(destination->length * sizeof(location_t));
   memcpy(destination->locations, source->locations, source->length * sizeof(location_t));
-  destination->points = (struct lqt_point*) malloc(destination->length * sizeof(struct lqt_point));
-  memcpy(destination->points, source->points, source->length * sizeof(struct lqt_point));
+  destination->points = (struct rtree_point*) malloc(destination->length * sizeof(struct rtree_point));
+  memcpy(destination->points, source->points, source->length * sizeof(struct rtree_point));
 }
 
 #undef ENDIANSWAP
