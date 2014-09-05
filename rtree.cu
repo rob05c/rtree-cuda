@@ -14,7 +14,50 @@ using namespace cub; // debug
 /// \todo fix to not be global
 CachingDeviceAllocator g_allocator(true); // CUB caching allocator for device memory
 
-struct rtree_points cuda_create_rtree(struct rtree_points points) {
+/// @todo make CUDA
+struct rtree_leaf* cuda_create_leaves(struct rtree_points sorted) {
+  struct rtree_leaf* leaves = (rtree_leaf*) malloc(sizeof(rtree_leaf) * sorted.length);
+  for(size_t i = 0, end = DIV_CEIL(sorted.length, RTREE_NODE_SIZE); i != end; ++i) {
+    rtree_leaf* l = &leaves[i];
+    
+    {
+      // let would be nice.
+      const size_t n = RTREE_NODE_SIZE;
+      const size_t len = sorted.length;
+      const size_t final_i = end - 1; // this better be optimised out
+      // this nasty bit sets lnum to len % n if it's the last iteration and there's a remainder, else n
+      // which avoids a GPU-breaking conditional
+      const size_t lnum = ((i != final_i || len % n == 0) * n) + ((i == final_i && len % n != 0) * (len % n));
+      l->num = lnum;
+    }
+
+    l->points = (rtree_point*) malloc(sizeof(rtree_point) * l->num);
+
+#   pragma unroll
+    for(size_t j = 0, jend = l->num; j != jend; ++j) {
+      rtree_point* p = &l->points[j];
+      p->x   = sorted.x[i * RTREE_NODE_SIZE + j];
+      p->y   = sorted.ykey[i * RTREE_NODE_SIZE + j].y;
+      p->key = sorted.ykey[i * RTREE_NODE_SIZE + j].key;
+    }
+  }
+  return leaves;
+}
+
+/// \return next level up. Length is ceil(nodes_len / RTREE_NODE_SIZE).
+struct rtree_node* cuda_create_level(struct rtree_node* nodes, const size_t nodes_len) {
+  const size_t next_level_len = nodes_len / RTREE_NODE_SIZE;
+  rtree_node* next_level = (rtree_node*) malloc(sizeof(rtree_node) * next_level_len);
+  for(size_t i = 0, end = nodes_len / RTREE_NODE_SIZE; i != end; ++i) {
+    rtree_node* n = &next_level[i];
+    n->num = RTREE_NODE_SIZE; ///< \todo fix for last iteration
+    // n->nodes doesn't need malloced - it will point to the node in nodes
+    n->nodes = &nodes[i * RTREE_NODE_SIZE];
+  }
+  return next_level;
+}
+
+struct rtree_points cuda_sort(struct rtree_points points) {
   typedef ord_t key_t;
   typedef struct rtree_y_key value_t;
   DoubleBuffer<key_t> d_keys;

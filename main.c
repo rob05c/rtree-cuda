@@ -54,9 +54,15 @@ static inline void test_rtree(const size_t num) {
 
   print_points(points);
 
-  points = cuda_create_rtree(points);
+  points = cuda_sort(points);
 
   print_points(points);
+
+  struct rtree_leaf* leaves = cuda_create_leaves(points);
+  const size_t leaves_len = DIV_CEIL(num, RTREE_NODE_SIZE);
+
+  printf("leaves\n");
+  rtree_print_leaves(leaves, leaves_len);
 
   destroy_points(points);
 }

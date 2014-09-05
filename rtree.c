@@ -190,4 +190,26 @@ void lqt_copy(struct linear_quadtree* destination, struct linear_quadtree* sourc
   memcpy(destination->points, source->points, source->length * sizeof(struct rtree_point));
 }
 
-#undef ENDIANSWAP
+inline void rtree_print_point(const struct rtree_point* point) {
+  printf("[%f,%f,%d]", point->x, point->y, point->key);
+}
+
+inline void rtree_print_leaf(const struct rtree_leaf* leaf) {
+  printf("[");
+  for(size_t i = 0, end = leaf->num; i != end; ++i) {
+    rtree_print_point(&leaf->points[i]);
+    if(i + 1 != end)
+      printf(",");
+  }
+  printf("]");
+}
+
+inline void rtree_print_leaves(const struct rtree_leaf* leaves, const size_t len) {
+  printf("[\n");
+  for(size_t i = 0, end = len; i != end; ++i) {
+    rtree_print_leaf(&leaves[i]);
+    if(i + 1 != end)
+      printf(",\n");
+  }
+  printf("\n]\n");
+}

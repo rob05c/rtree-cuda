@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <limits.h>
 
+#define DIV_CEIL(x, y) ((x + y - 1) / y)
+
 // nvcc is C++, not C
 #ifdef __cplusplus
 extern "C" {
@@ -71,7 +73,27 @@ void lqt_delete(struct linear_quadtree);
 void lqt_print_node(const location_t* location, const struct rtree_point* point, const bool verbose);
 void lqt_print_nodes(struct linear_quadtree lqt, const bool verbose);
 
-struct rtree_points cuda_create_rtree(struct rtree_points points);
+
+#define RTREE_NODE_SIZE 4
+
+struct rtree_leaf {
+  size_t       num;
+  struct rtree_point* points;
+};
+
+struct rtree_node {
+  size_t      num;
+  struct rtree_node* nodes;
+};
+
+  void rtree_print_leaves(const struct rtree_leaf* leaves, const size_t len);
+void rtree_print_leaf(const struct rtree_leaf* leaf);
+void rtree_print_point(const struct rtree_point* point);
+
+struct rtree_points cuda_sort(struct rtree_points points);
+struct rtree_leaf* cuda_create_leaves(struct rtree_points sorted);
+struct rtree_node* cuda_create_level(struct rtree_node* nodes, const size_t nodes_len);
+struct rtree_node* cuda_create_level_leaf(struct rtree_leaf* nodes); ///< @todo use macro
 
 #ifdef __cplusplus
 }
