@@ -14,7 +14,7 @@ static inline void msg(const char* m, ...) {
 }
 */
 
-// generate a uniform random between min and max exclusive
+/// generate a uniform random between min and max exclusive
 static inline ord_t uniform_frand(const ord_t min, const ord_t max) {
   const double r = (double)rand() / RAND_MAX;
   return min + r * (max - min);
@@ -58,19 +58,6 @@ static inline void test_rtree(const size_t num) {
 
   rtree_print(tree);
 
-
-/*
-  points = cuda_sort(points);
-
-  print_points(points);
-
-  struct rtree_leaf* leaves = cuda_create_leaves(points);
-  const size_t leaves_len = DIV_CEIL(num, RTREE_NODE_SIZE);
-
-  printf("leaves\n");
-  rtree_print_leaves(leaves, leaves_len);
-*/
-
   destroy_points(points);
 }
 
@@ -108,8 +95,6 @@ static struct app_arguments parse_args(const int argc, const char** argv) {
   return args;
 }
 
-/// \param[out] msg
-/// \param[out] msg_len
 static void print_usage(const char* app_name) {
   const char* default_app_name = "rtree";
   printf("usage: %s array_size\n", strlen(app_name) == 0 ? default_app_name : app_name);
