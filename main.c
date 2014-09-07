@@ -52,8 +52,14 @@ static inline void test_rtree(const size_t num) {
 
   struct rtree_points points = create_points(num);
 
+  struct rtree tree = cuda_create_rtree(points);
+
   print_points(points);
 
+  rtree_print(tree);
+
+
+/*
   points = cuda_sort(points);
 
   print_points(points);
@@ -63,6 +69,7 @@ static inline void test_rtree(const size_t num) {
 
   printf("leaves\n");
   rtree_print_leaves(leaves, leaves_len);
+*/
 
   destroy_points(points);
 }

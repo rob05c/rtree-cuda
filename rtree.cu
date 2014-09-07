@@ -4,6 +4,8 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>    
+#include <assert.h>
+#include <math.h>
 #include <linux/cuda.h>
 #include <cub/cub.cuh>
 #include <cub/util_allocator.cuh>
@@ -14,47 +16,127 @@ using namespace cub; // debug
 /// \todo fix to not be global
 CachingDeviceAllocator g_allocator(true); // CUB caching allocator for device memory
 
-/// @todo make CUDA
+inline void update_boundary(struct rtree_rect* boundary, struct rtree_point* p) {
+  /// \todo replace these with CUDA min/max which won't use conditionals
+  boundary->top = fmin(p->y, boundary->top);
+  boundary->bottom = fmax(p->y, boundary->bottom);
+  boundary->left = fmin(p->x, boundary->left);
+  boundary->right = fmax(p->x, boundary->right);
+}
+
+inline void update_boundary(struct rtree_rect* boundary, struct rtree_rect* node) {
+  /// \todo replace these with CUDA min/max which won't use conditionals
+  boundary->top = fmin(node->top, boundary->top);
+  boundary->bottom = fmax(node->bottom, boundary->bottom);
+  boundary->left = fmin(node->left, boundary->left);
+  boundary->right = fmax(node->right, boundary->right);
+}
+
+/// initialize boundary so the first udpate overrides it.
+inline void init_boundary(struct rtree_rect* boundary) {
+  boundary->top = ord_t_max;
+  boundary->bottom = ord_t_lowest;
+  boundary->left = ord_t_max;
+  boundary->right = ord_t_lowest;
+}
+
+/// used to calculate tree height
+/// \todo use CUDA maths
+inline size_t log_base_ceil(const size_t x, const size_t base) {
+  return (size_t)ceil(log((double)x) / log((double)base));
+}
+
+
+inline size_t get_node_length(const size_t i, const size_t level_len, const size_t previous_level_len, const size_t node_size) {
+  // let would be nice.
+  const size_t n = node_size;
+  const size_t len = previous_level_len;
+  const size_t final_i = level_len - 1; // this better be optimised out
+  // this nasty bit sets lnum to len % n if it's the last iteration and there's a remainder, else n
+  // which avoids a GPU-breaking conditional
+  return ((i != final_i || len % n == 0) * n) + ((i == final_i && len % n != 0) * (len % n));
+}
+
+struct rtree cuda_create_rtree(struct rtree_points points) {
+//  struct rtree tree;
+//  tree.depth = log_base_ceil(points.length, RTREE_NODE_SIZE);
+//  tree.levels = (rtree_node**) malloc(sizeof(struct rtree_node) * tree.depth);
+
+  struct rtree_leaf* leaves = cuda_create_leaves(cuda_sort(points));
+  const size_t leaves_len = DIV_CEIL(points.length, RTREE_NODE_SIZE);
+
+  // points can be deleted now;
+
+/*  
+  tree.levels[0] = (rtree_node*) leaves;
+  for(size_t i = 1, end = tree.depth, previous_len = leaves_len; i != end; ++i, previous_len = DIV_CEIL(previous_len, RTREE_NODE_SIZE)) {
+    tree.levels[i] = cuda_create_level(tree.levels[i - 1], previous_len);
+  }
+*/
+
+  rtree_node* previous_level = (rtree_node*) leaves;
+  size_t      previous_len = leaves_len;
+  size_t      depth = 1; // leaf level is 0
+  while(previous_len > RTREE_NODE_SIZE) {
+    previous_level = cuda_create_level(previous_level, previous_len);
+    previous_len = DIV_CEIL(previous_len, RTREE_NODE_SIZE);
+    ++depth;
+  }
+
+  rtree_node* root = (rtree_node*) malloc(sizeof(rtree_node));
+  init_boundary(&root->bounding_box);
+  root->num = previous_len;
+  root->children = previous_level;
+  for(size_t i = 0, end = previous_len; i != end; ++i)
+    update_boundary(&root->bounding_box, &root->children[i].bounding_box);
+  ++depth;
+
+  struct rtree tree = {depth, root};
+  return tree;
+}
+
+/// \param nodes Can really be either a rtree_node or rtree_leaf; doesn't matter to us, we won't dereference .children
+/// \return next level up. Length is ceil(nodes_len / RTREE_NODE_SIZE)
+struct rtree_node* cuda_create_level(struct rtree_node* nodes, const size_t nodes_len) {
+  const size_t next_level_len = DIV_CEIL(nodes_len, RTREE_NODE_SIZE);
+  rtree_node* next_level = (rtree_node*) malloc(sizeof(rtree_node) * next_level_len);
+  init_boundary(&next_level->bounding_box);
+
+  for(size_t i = 0, end = next_level_len; i != end; ++i) {
+    rtree_node* n = &next_level[i];
+    init_boundary(&n->bounding_box);
+    n->num = get_node_length(i, end, next_level_len, RTREE_NODE_SIZE);
+    // n->nodes doesn't need malloced - it will point to the node in nodes
+    n->children = (rtree_node*)&nodes[i * RTREE_NODE_SIZE];
+
+#   pragma unroll
+    for(size_t j = 0, jend = n->num; j != jend; ++j)
+      update_boundary(&n->bounding_box, &n->children[j].bounding_box);
+  }
+  return next_level;
+}
+
+/// \todo make CUDA
 struct rtree_leaf* cuda_create_leaves(struct rtree_points sorted) {
+  static_assert(sizeof(rtree_node) == sizeof(rtree_leaf), "rtree node, leaf sizes must be equal, since leaves are passed to create_level");
+
   struct rtree_leaf* leaves = (rtree_leaf*) malloc(sizeof(rtree_leaf) * sorted.length);
   for(size_t i = 0, end = DIV_CEIL(sorted.length, RTREE_NODE_SIZE); i != end; ++i) {
     rtree_leaf* l = &leaves[i];
-    
-    {
-      // let would be nice.
-      const size_t n = RTREE_NODE_SIZE;
-      const size_t len = sorted.length;
-      const size_t final_i = end - 1; // this better be optimised out
-      // this nasty bit sets lnum to len % n if it's the last iteration and there's a remainder, else n
-      // which avoids a GPU-breaking conditional
-      const size_t lnum = ((i != final_i || len % n == 0) * n) + ((i == final_i && len % n != 0) * (len % n));
-      l->num = lnum;
-    }
-
+    init_boundary(&l->bounding_box);
+    l->num = get_node_length(i, end, sorted.length, RTREE_NODE_SIZE);
     l->points = (rtree_point*) malloc(sizeof(rtree_point) * l->num);
-
+    
 #   pragma unroll
     for(size_t j = 0, jend = l->num; j != jend; ++j) {
       rtree_point* p = &l->points[j];
       p->x   = sorted.x[i * RTREE_NODE_SIZE + j];
       p->y   = sorted.ykey[i * RTREE_NODE_SIZE + j].y;
       p->key = sorted.ykey[i * RTREE_NODE_SIZE + j].key;
+      update_boundary(&l->bounding_box, p);
     }
   }
   return leaves;
-}
-
-/// \return next level up. Length is ceil(nodes_len / RTREE_NODE_SIZE).
-struct rtree_node* cuda_create_level(struct rtree_node* nodes, const size_t nodes_len) {
-  const size_t next_level_len = nodes_len / RTREE_NODE_SIZE;
-  rtree_node* next_level = (rtree_node*) malloc(sizeof(rtree_node) * next_level_len);
-  for(size_t i = 0, end = nodes_len / RTREE_NODE_SIZE; i != end; ++i) {
-    rtree_node* n = &next_level[i];
-    n->num = RTREE_NODE_SIZE; ///< \todo fix for last iteration
-    // n->nodes doesn't need malloced - it will point to the node in nodes
-    n->nodes = &nodes[i * RTREE_NODE_SIZE];
-  }
-  return next_level;
 }
 
 struct rtree_points cuda_sort(struct rtree_points points) {
