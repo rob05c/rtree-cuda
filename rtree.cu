@@ -10,6 +10,7 @@
 #include <cub/cub.cuh>
 #include <cub/util_allocator.cuh>
 #include <cub/device/device_radix_sort.cuh>
+#include "tbb/tbb.h"
 
 using namespace cub; // debug
 
@@ -24,7 +25,7 @@ inline void update_boundary(struct rtree_rect* boundary, struct rtree_point* p) 
   boundary->right = fmax(p->x, boundary->right);
 }
 
-__device__ void c_update_boundary(struct rtree_rect* boundary, struct rtree_point* p) {
+__device__ void c_update_boundary(struct rtree_rect* boundary, const struct rtree_point* p) {
   /// \todo replace these with CUDA min/max which won't use conditionals
   boundary->top = fminf(p->y, boundary->top);
   boundary->bottom = fmaxf(p->y, boundary->bottom);
@@ -90,6 +91,31 @@ __device__ size_t c_get_node_length(const size_t i, const size_t level_len, cons
   // this nasty bit sets lnum to len % n if it's the last iteration and there's a remainder, else n
   // which avoids a GPU-breaking conditional
   return ((i != final_i || len % n == 0) * n) + ((i == final_i && len % n != 0) * (len % n));
+}
+
+struct rtree cuda_create_rtree_heterogeneously(struct rtree_point* points, const size_t len) {
+  struct rtree_leaf* leaves = cuda_create_leaves_together(tbb_sort(points, len), len);
+  const size_t leaves_len = DIV_CEIL(len, RTREE_NODE_SIZE);
+
+  rtree_node* previous_level = (rtree_node*) leaves;
+  size_t      previous_len = leaves_len;
+  size_t      depth = 1; // leaf level is 0
+  while(previous_len > RTREE_NODE_SIZE) {
+    previous_level = cuda_create_level(previous_level, previous_len);
+    previous_len = DIV_CEIL(previous_len, RTREE_NODE_SIZE);
+    ++depth;
+  }
+
+  rtree_node* root = (rtree_node*) malloc(sizeof(rtree_node));
+  init_boundary(&root->bounding_box);
+  root->num = previous_len;
+  root->children = previous_level;
+  for(size_t i = 0, end = previous_len; i != end; ++i)
+    update_boundary(&root->bounding_box, &root->children[i].bounding_box);
+  ++depth;
+
+  struct rtree tree = {depth, root};
+  return tree;
 }
 
 struct rtree cuda_create_rtree(struct rtree_points points) {
@@ -162,6 +188,55 @@ struct rtree_node* cuda_create_level(struct rtree_node* nodes, const size_t node
 }
 
 /// \param real_points NOT CUDA MEMORY! CANNOT BE ACCESSED!
+__global__ void create_leaves_together_kernel(rtree_leaf* leaves, rtree_point* points, rtree_point* real_points, const size_t len) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  const size_t len_leaves = DIV_CEIL(len, RTREE_NODE_SIZE);
+
+  if(i >= len_leaves)
+    return; // skip the final block remainder
+
+  rtree_leaf* l = &leaves[i];
+  c_init_boundary(&l->bounding_box);
+  l->num = c_get_node_length(i, len_leaves, len, RTREE_NODE_SIZE);
+  l->points = &real_points[i * RTREE_NODE_SIZE];
+
+# pragma unroll
+  for(size_t j = 0, jend = l->num; j != jend; ++j) {
+    const rtree_point* p = &points[i * RTREE_NODE_SIZE + j];
+    c_update_boundary(&l->bounding_box, p);
+  }
+}
+
+struct rtree_leaf* cuda_create_leaves_together(struct rtree_point* sorted, const size_t len) {
+  static_assert(sizeof(rtree_node) == sizeof(rtree_leaf), "rtree node, leaf sizes must be equal, since leaves are passed to create_level");
+
+  const size_t THREADS_PER_BLOCK = 512;
+
+  const size_t leaves_num = DIV_CEIL(len, RTREE_NODE_SIZE);
+
+  rtree_leaf*  cuda_leaves;
+  rtree_point* cuda_points;
+
+  cudaMalloc((void**)&cuda_leaves, leaves_num * sizeof(rtree_leaf));
+  cudaMalloc((void**)&cuda_points, len * sizeof(rtree_point));
+
+  cudaMemcpy(cuda_points, sorted, len * sizeof(rtree_point), cudaMemcpyHostToDevice);
+
+  create_leaves_together_kernel<<<(leaves_num + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(cuda_leaves, cuda_points, sorted, len);
+
+  rtree_leaf* leaves = (rtree_leaf*) malloc(sizeof(rtree_leaf) * leaves_num);
+
+  cudaMemcpy(leaves, cuda_leaves, leaves_num * sizeof(rtree_leaf), cudaMemcpyDeviceToHost);
+
+  cudaFree(cuda_leaves);
+  cudaFree(cuda_points);
+
+  return leaves;
+}
+
+
+/// \param real_points NOT CUDA MEMORY! CANNOT BE ACCESSED!
 __global__ void create_leaves_kernel(rtree_leaf* leaves, rtree_point* points, rtree_point* real_points, ord_t* x, rtree_y_key* ykey, const size_t len) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -227,6 +302,19 @@ struct rtree_leaf* cuda_create_leaves(struct rtree_points sorted) {
   cudaFree(cuda_points);
 
   return leaves;
+}
+
+// x value ALONE is used for comparison, to create an xpack
+bool operator<(const rtree_point& rhs, const rtree_point& lhs) {
+  return rhs.x < lhs.x;
+}
+
+struct rtree_point* tbb_sort(struct rtree_point* points, const size_t len) {
+//  auto lowxpack = [](const struct rtree_point& rhs, const struct rtree_point& lhs) {
+//    return rhs.x < rhs.y;
+//  };
+  tbb::parallel_sort(points, points + len);
+  return points;
 }
 
 struct rtree_points cuda_sort(struct rtree_points points) {

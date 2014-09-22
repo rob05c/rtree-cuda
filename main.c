@@ -20,6 +20,19 @@ static inline ord_t uniform_frand(const ord_t min, const ord_t max) {
   return min + r * (max - min);
 }
 
+static inline struct rtree_point* create_points_together(const size_t num) {
+  const ord_t min = 0.0f;
+  const ord_t max = 100.0f;
+
+  struct rtree_point* points = malloc(sizeof(struct rtree_point) * num);
+  for(size_t i = 0, end = num; i != end; ++i) {
+    points[i].x = uniform_frand(min, max);
+    points[i].y = uniform_frand(min, max);
+    points[i].key = i;
+  }
+  return points;
+}
+
 static inline struct rtree_points create_points(const size_t num) {
   const ord_t min = 0.0f;
   const ord_t max = 100.0f;
@@ -47,6 +60,14 @@ static inline void print_points(struct rtree_points points) {
   printf("\n");
 }
 
+static inline void print_points_together(struct rtree_point* points, const size_t len) {
+  printf("x\ty\tkey\n");
+  for(size_t i = 0, end = len; i != end; ++i)
+    printf("%f\t%f\t%d\n", points[i].x, points[i].y, points[i].key);
+  printf("\n");
+}
+
+
 static inline void test_rtree(const size_t num) {
   title();
 
@@ -61,11 +82,24 @@ static inline void test_rtree(const size_t num) {
   destroy_points(points);
 }
 
+static inline void test_rtree_together(const size_t num) {
+  title();
+
+  struct rtree_point* points = create_points_together(num);
+
+  struct rtree tree = cuda_create_rtree_heterogeneously(points, num);
+
+  print_points_together(points, num);
+
+  rtree_print(tree);
+
+  free(points);
+}
 
 struct app_arguments {
   bool        success;
   const char* app_name;
-//  size_t      test_num;
+  size_t      test_num;
   size_t      array_size;
 };
 
@@ -79,12 +113,10 @@ static struct app_arguments parse_args(const int argc, const char** argv) {
   args.app_name = argv[arg_i];
   ++arg_i;
 
-/*
   if(argc <= arg_i)
     return args;
   args.test_num = strtol(argv[arg_i], NULL, 10);
   ++arg_i;
-*/
 
   if(argc <= arg_i)
     return args;
@@ -97,12 +129,14 @@ static struct app_arguments parse_args(const int argc, const char** argv) {
 
 static void print_usage(const char* app_name) {
   const char* default_app_name = "rtree";
-  printf("usage: %s array_size\n", strlen(app_name) == 0 ? default_app_name : app_name);
+  printf("usage: %s test_num array_size\n", strlen(app_name) == 0 ? default_app_name : app_name);
+  printf("       test 0: CUDA construction\n");
+  printf("       test 1: heterogeneous CUDA+TBB construction\n");
   printf("\n");
 }
 
 int main(const int argc, const char** argv) {
-  srand(time(NULL));
+  srand(4242); // seed deterministically, so results are reproducible
 
   const struct app_arguments args = parse_args(argc, argv);
   if(!args.success) {
@@ -110,7 +144,10 @@ int main(const int argc, const char** argv) {
     return 0;
   }
 
-  test_rtree(args.array_size);
+  if(args.test_num == 0)
+    test_rtree(args.array_size);
+  else
+    test_rtree_together(args.array_size);
 
   printf("\n");
   return 0;
