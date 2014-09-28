@@ -4,6 +4,7 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <time.h>
 
 #define title() do{printf("%s\n", __func__);} while(0)
 /*
@@ -13,6 +14,8 @@ static inline void msg(const char* m, ...) {
   vprintf(m, args);
 }
 */
+
+const bool PRINT_CUTOFF = 1000;
 
 /// generate a uniform random between min and max exclusive
 static inline ord_t uniform_frand(const ord_t min, const ord_t max) {
@@ -73,11 +76,17 @@ static inline void test_rtree(const size_t num) {
 
   struct rtree_points points = create_points(num);
 
+  const clock_t start = clock();
   struct rtree tree = cuda_create_rtree(points);
+  const clock_t end = clock();
+  const size_t elapsed_ms = end - start * 1000 / CLOCKS_PER_SEC;
 
-  print_points(points);
+  printf("elasped: %lums\n", elapsed_ms);
 
-  rtree_print(tree);
+  if(num < PRINT_CUTOFF) {
+    print_points(points);
+    rtree_print(tree);
+  }
 
   destroy_points(points);
 }
@@ -87,11 +96,17 @@ static inline void test_rtree_together(const size_t num) {
 
   struct rtree_point* points = create_points_together(num);
 
+  const clock_t start = clock();
   struct rtree tree = cuda_create_rtree_heterogeneously(points, num);
+  const clock_t end = clock();
+  const size_t elapsed_ms = end - start * 1000 / CLOCKS_PER_SEC;
 
-  print_points_together(points, num);
+  printf("elasped: %lums\n", elapsed_ms);
 
-  rtree_print(tree);
+  if(num < PRINT_CUTOFF) {
+    print_points_together(points, num);
+    rtree_print(tree);
+  }
 
   free(points);
 }

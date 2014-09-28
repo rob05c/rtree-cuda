@@ -78,6 +78,8 @@ struct rtree cuda_create_rtree_heterogeneously(struct rtree_point* points, const
 struct rtree_point* tbb_sort(struct rtree_point* points, const size_t len);
 struct rtree_leaf* cuda_create_leaves_together(struct rtree_point* sorted, const size_t len);
 
+struct rtree cuda_create_rtree_heterogeneously_mergesort(struct rtree_point* points, const size_t len);
+
 void rtree_print_rect(struct rtree_rect r);
 void rtree_print_node(struct rtree_node* n, const size_t depth);
 void rtree_print(struct rtree tree);

@@ -11,8 +11,19 @@
 #include <cub/util_allocator.cuh>
 #include <cub/device/device_radix_sort.cuh>
 #include "tbb/tbb.h"
+#include "mergesort.hh"
 
 using namespace cub; // debug
+
+// x value ALONE is used for comparison, to create an xpack
+bool operator<(const rtree_point& rhs, const rtree_point& lhs) {
+  return rhs.x < lhs.x;
+}
+
+// x value ALONE is used for comparison, to create an xpack
+bool rtree_point_less(const rtree_point& rhs, const rtree_point& lhs) {
+  return rhs.x < lhs.x;
+}
 
 /// \todo fix to not be global
 CachingDeviceAllocator g_allocator(true); // CUB caching allocator for device memory
@@ -117,6 +128,32 @@ struct rtree cuda_create_rtree_heterogeneously(struct rtree_point* points, const
   struct rtree tree = {depth, root};
   return tree;
 }
+
+struct rtree cuda_create_rtree_heterogeneously_mergesort(struct rtree_point* points, const size_t len) {
+  struct rtree_leaf* leaves = cuda_create_leaves_together(parallel_mergesort(points, points + len), len);
+  const size_t leaves_len = DIV_CEIL(len, RTREE_NODE_SIZE);
+
+  rtree_node* previous_level = (rtree_node*) leaves;
+  size_t      previous_len = leaves_len;
+  size_t      depth = 1; // leaf level is 0
+  while(previous_len > RTREE_NODE_SIZE) {
+    previous_level = cuda_create_level(previous_level, previous_len);
+    previous_len = DIV_CEIL(previous_len, RTREE_NODE_SIZE);
+    ++depth;
+  }
+
+  rtree_node* root = (rtree_node*) malloc(sizeof(rtree_node));
+  init_boundary(&root->bounding_box);
+  root->num = previous_len;
+  root->children = previous_level;
+  for(size_t i = 0, end = previous_len; i != end; ++i)
+    update_boundary(&root->bounding_box, &root->children[i].bounding_box);
+  ++depth;
+
+  struct rtree tree = {depth, root};
+  return tree;
+}
+
 
 struct rtree cuda_create_rtree(struct rtree_points points) {
   struct rtree_leaf* leaves = cuda_create_leaves(cuda_sort(points));
@@ -302,11 +339,6 @@ struct rtree_leaf* cuda_create_leaves(struct rtree_points sorted) {
   cudaFree(cuda_points);
 
   return leaves;
-}
-
-// x value ALONE is used for comparison, to create an xpack
-bool operator<(const rtree_point& rhs, const rtree_point& lhs) {
-  return rhs.x < lhs.x;
 }
 
 struct rtree_point* tbb_sort(struct rtree_point* points, const size_t len) {

@@ -4,6 +4,7 @@ CUDA_CC=nvcc
 CUDA_FLAGS=-std=c++11 -g -I /usr/local/cuda/include -I ../../cuda/cub
 LINK_CC=clang++
 LINK_FLAGS=-L/usr/local/cuda/lib64 -lcuda -lcudart -ltbb
+CC_CPP=clang++
 
 all: rtree
 rtree: rtree.o main.o rtreecuda.o
