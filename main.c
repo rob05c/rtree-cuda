@@ -15,7 +15,7 @@ static inline void msg(const char* m, ...) {
 }
 */
 
-const bool PRINT_CUTOFF = 1000;
+const size_t PRINT_CUTOFF = 1000;
 
 /// generate a uniform random between min and max exclusive
 static inline ord_t uniform_frand(const ord_t min, const ord_t max) {
@@ -81,7 +81,7 @@ static inline void test_rtree(const size_t num) {
   const clock_t end = clock();
   const size_t elapsed_ms = end - start * 1000 / CLOCKS_PER_SEC;
 
-  printf("elasped: %lums\n", elapsed_ms);
+  printf("elapsed: %lums\n", elapsed_ms);
 
   if(num < PRINT_CUTOFF) {
     print_points(points);
@@ -101,8 +101,7 @@ static inline void test_rtree_together(const size_t num) {
   const clock_t end = clock();
   const size_t elapsed_ms = end - start * 1000 / CLOCKS_PER_SEC;
 
-  printf("elasped: %lums\n", elapsed_ms);
-
+  printf("elapsed: %lums\n", elapsed_ms);
   if(num < PRINT_CUTOFF) {
     print_points_together(points, num);
     rtree_print(tree);
