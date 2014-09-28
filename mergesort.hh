@@ -6,9 +6,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <vector>
-#include <atomic>
 #include <memory>
-#include <chrono>
 #include "tbb/tbb.h"
 
 namespace {
@@ -18,13 +16,7 @@ using std::numeric_limits;
 using std::cout;
 using std::endl;
 using std::to_string;
-using std::atomic;
-using std::atomic_fetch_add;
 using std::unique_ptr;
-using std::chrono::time_point;
-using std::chrono::duration_cast;
-using std::chrono::high_resolution_clock;
-using std::chrono::milliseconds;
 using tbb::parallel_for;
 using tbb::blocked_range;
 using tbb::parallel_do;
