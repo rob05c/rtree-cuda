@@ -97,8 +97,8 @@ __device__ size_t c_get_node_length(const size_t i, const size_t level_len, cons
   return ((i != final_i || len % n == 0) * n) + ((i == final_i && len % n != 0) * (len % n));
 }
 
-struct rtree cuda_create_rtree_heterogeneously(struct rtree_point* points, const size_t len) {
-  struct rtree_leaf* leaves = cuda_create_leaves_together(tbb_sort(points, len), len);
+struct rtree cuda_create_rtree_heterogeneously(struct rtree_point* points, const size_t len, const size_t threads) {
+  struct rtree_leaf* leaves = cuda_create_leaves_together(tbb_sort(points, len, threads), len);
   const size_t leaves_len = DIV_CEIL(len, RTREE_NODE_SIZE);
 
   rtree_node* previous_level = (rtree_node*) leaves;

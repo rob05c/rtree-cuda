@@ -74,11 +74,12 @@ struct rtree_leaf* cuda_create_leaves(struct rtree_points sorted);
 struct rtree_node* cuda_create_level(struct rtree_node* nodes, const size_t nodes_len);
 struct rtree cuda_create_rtree(struct rtree_points points);
 
-struct rtree cuda_create_rtree_heterogeneously(struct rtree_point* points, const size_t len);
-struct rtree_point* tbb_sort(struct rtree_point* points, const size_t len);
+struct rtree cuda_create_rtree_heterogeneously(struct rtree_point* points, const size_t len, const size_t threads);
+struct rtree_point* tbb_sort(struct rtree_point* points, const size_t len, const size_t threads);
 struct rtree_leaf* cuda_create_leaves_together(struct rtree_point* sorted, const size_t len);
 
-struct rtree cuda_create_rtree_heterogeneously_mergesort(struct rtree_point* points, const size_t len);
+struct rtree cuda_create_rtree_heterogeneously_mergesort(struct rtree_point* points, const size_t len, const size_t threads);
+struct rtree cuda_create_rtree_sisd(struct rtree_point* points, const size_t len);
 
 void rtree_print_rect(struct rtree_rect r);
 void rtree_print_node(struct rtree_node* n, const size_t depth);

@@ -11,7 +11,7 @@ all: rtree
 rtree: rtree.o main.o rtreecuda.o nocuda.o
 	$(LINK_CC) main.o rtree.o rtreecuda.o nocuda.o -o rtree -lm $(LINK_FLAGS)
 main.o: 
-	$(CC) $(FLAGS) -c main.c -o main.o
+	$(CC_CPP) $(CPP_FLAGS) -c main.cpp -o main.o
 rtree.o:
 	$(CC) $(FLAGS) -c rtree.c -o rtree.o
 rtreecuda.o:

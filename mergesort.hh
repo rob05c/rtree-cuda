@@ -99,10 +99,12 @@ void mergesort_(T* array, T* array_end, T* buffer, const bool inplace) {
 } // namespace
 
 template <typename T>
-T* parallel_mergesort(T* array, T* array_end) {
+T* parallel_mergesort(T* array, T* array_end, size_t threads) {
+  tbb::task_scheduler_init init(threads);
+
   unique_ptr<T[]> buffer(new T[array_end - array]);
   mergesort_<T>(array, array_end, buffer.get(), true);
   return array;
-}  
+}
 
 #endif // hello_hh

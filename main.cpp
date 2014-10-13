@@ -4,7 +4,7 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
-#include <time.h>
+#include <chrono>
 
 #define title() do{printf("%s\n", __func__);} while(0)
 /*
@@ -14,6 +14,13 @@ static inline void msg(const char* m, ...) {
   vprintf(m, args);
 }
 */
+
+namespace
+{
+using std::chrono::duration;
+using std::chrono::duration_cast;
+typedef std::chrono::high_resolution_clock Clock;
+}
 
 const size_t PRINT_CUTOFF = 1000;
 
@@ -27,7 +34,7 @@ static inline struct rtree_point* create_points_together(const size_t num) {
   const ord_t min = 0.0f;
   const ord_t max = 100.0f;
 
-  struct rtree_point* points = malloc(sizeof(struct rtree_point) * num);
+  struct rtree_point* points = (rtree_point*) malloc(sizeof(struct rtree_point) * num);
   for(size_t i = 0, end = num; i != end; ++i) {
     points[i].x = uniform_frand(min, max);
     points[i].y = uniform_frand(min, max);
@@ -40,8 +47,8 @@ static inline struct rtree_points create_points(const size_t num) {
   const ord_t min = 0.0f;
   const ord_t max = 100.0f;
 
-  ord_t* x = malloc(sizeof(ord_t) * num);
-  struct rtree_y_key* ykey = malloc(sizeof(struct rtree_y_key) * num);
+  ord_t* x = (ord_t*) malloc(sizeof(ord_t) * num);
+  struct rtree_y_key* ykey = (rtree_y_key*) malloc(sizeof(struct rtree_y_key) * num);
   struct rtree_points points = {x, ykey, num};
   for(size_t i = 0, end = num; i != end; ++i) {
     points.x[i] = uniform_frand(min, max);
@@ -71,17 +78,18 @@ static inline void print_points_together(struct rtree_point* points, const size_
 }
 
 
-static inline void test_rtree(const size_t num) {
+/// SIMD sort (CUDA)
+static inline void test_rtree_simd(const size_t num) {
   title();
 
   struct rtree_points points = create_points(num);
 
-  const clock_t start = clock();
+  const auto start = Clock::now();
   struct rtree tree = cuda_create_rtree(points);
-  const clock_t end = clock();
-  const size_t elapsed_ms = end - start * 1000 / CLOCKS_PER_SEC;
+  const auto end = Clock::now();
+  const auto elapsed_s = duration_cast<duration<double>>(end - start);
 
-  printf("elapsed: %lums\n", elapsed_ms);
+  printf("elapsed: %fs\n", elapsed_s.count());
 
   if(num < PRINT_CUTOFF) {
     print_points(points);
@@ -91,17 +99,40 @@ static inline void test_rtree(const size_t num) {
   destroy_points(points);
 }
 
-static inline void test_rtree_together(const size_t num) {
+/// MIMD sort (multicore CPU via TBB)
+static inline void test_rtree_mimd(const size_t num, const size_t threads) {
   title();
 
   struct rtree_point* points = create_points_together(num);
 
-  const clock_t start = clock();
-  struct rtree tree = cuda_create_rtree_heterogeneously(points, num);
-  const clock_t end = clock();
-  const size_t elapsed_ms = end - start * 1000 / CLOCKS_PER_SEC;
+  const auto start = Clock::now();
+  struct rtree tree = cuda_create_rtree_heterogeneously(points, num, threads);
+  const auto end = Clock::now();
+  const auto elapsed_s = duration_cast<duration<double>>(end - start);
 
-  printf("elapsed: %lums\n", elapsed_ms);
+  printf("elapsed: %fs\n", elapsed_s.count());
+
+  if(num < PRINT_CUTOFF) {
+    print_points_together(points, num);
+    rtree_print(tree);
+  }
+
+  free(points);
+}
+
+/// SISD sort (single core CPU via std::sort)
+static inline void test_rtree_sisd(const size_t num) {
+  title();
+
+  struct rtree_point* points = create_points_together(num);
+
+  const auto start = Clock::now();
+  struct rtree tree = cuda_create_rtree_sisd(points, num);
+  const auto end = Clock::now();
+  const auto elapsed_s = duration_cast<duration<double>>(end - start);
+
+  printf("elapsed: %fs\n", elapsed_s.count());
+
   if(num < PRINT_CUTOFF) {
     print_points_together(points, num);
     rtree_print(tree);
@@ -115,13 +146,14 @@ struct app_arguments {
   const char* app_name;
   size_t      test_num;
   size_t      array_size;
+  size_t      threads;
 };
 
 static struct app_arguments parse_args(const int argc, const char** argv) {
   struct app_arguments args;
   args.success = false;
 
-  size_t arg_i = 0;
+  int arg_i = 0;
   if(argc <= arg_i)
     return args;
   args.app_name = argv[arg_i];
@@ -137,15 +169,24 @@ static struct app_arguments parse_args(const int argc, const char** argv) {
   args.array_size = strtol(argv[arg_i], NULL, 10);
   ++arg_i;
 
+  if(args.test_num == 1) {
+    if(argc <= arg_i)
+      return args;
+    args.threads = strtol(argv[arg_i], NULL, 10);
+  }
+  ++arg_i;
+
   args.success = true;
   return args;
 }
 
 static void print_usage(const char* app_name) {
   const char* default_app_name = "rtree";
-  printf("usage: %s test_num array_size\n", strlen(app_name) == 0 ? default_app_name : app_name);
+  printf("usage: %s test_num array_size threads\n", strlen(app_name) == 0 ? default_app_name : app_name);
   printf("       test 0: CUDA construction\n");
   printf("       test 1: heterogeneous CUDA+TBB construction\n");
+  printf("       test 2: serial sort with CUDA construction\n");
+  printf(" *threads is ONLY used for test 1, and then only for the MIMD sort. 2xCores is generally good.\n");
   printf("\n");
 }
 
@@ -159,9 +200,11 @@ int main(const int argc, const char** argv) {
   }
 
   if(args.test_num == 0)
-    test_rtree(args.array_size);
-  else
-    test_rtree_together(args.array_size);
+    test_rtree_simd(args.array_size);
+  else if(args.test_num == 1)
+    test_rtree_mimd(args.array_size, args.threads);
+  else if(args.test_num == 2)
+    test_rtree_sisd(args.array_size);
 
   printf("\n");
   return 0;
