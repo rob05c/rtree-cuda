@@ -9,11 +9,6 @@
 // efficient ceil((float)a/(float)b)
 #define DIV_CEIL(x, y) (((x) + (y) - 1) / (y))
 
-// nvcc is C++, not C
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 typedef int key_t;
 typedef float ord_t; // ordinate. There's only one, so it's not a coordinate.
 #define ord_t_max FLT_MAX;
@@ -84,9 +79,5 @@ struct rtree cuda_create_rtree_sisd(struct rtree_point* points, const size_t len
 void rtree_print_rect(struct rtree_rect r);
 void rtree_print_node(struct rtree_node* n, const size_t depth);
 void rtree_print(struct rtree tree);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

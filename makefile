@@ -1,5 +1,3 @@
-CC=gcc
-FLAGS= -std=c99 -Wall -Wpedantic -Werror -Wfatal-errors -g
 CUDA_CC=nvcc
 CUDA_FLAGS= -g -I /usr/local/cuda/include -I ../../cuda/cub
 LINK_CC=g++
@@ -13,7 +11,7 @@ rtree: rtree.o main.o rtreecuda.o nocuda.o
 main.o: 
 	$(CC_CPP) $(CPP_FLAGS) -c main.cpp -o main.o
 rtree.o:
-	$(CC) $(FLAGS) -c rtree.c -o rtree.o
+	$(CC_CPP) $(FLAGS) -c rtree.cpp -o rtree.o
 rtreecuda.o:
 	$(CUDA_CC) $(CUDA_FLAGS) -c rtree.cu -o rtreecuda.o
 nocuda.o:
