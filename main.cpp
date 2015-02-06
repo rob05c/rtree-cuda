@@ -4,7 +4,11 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <iostream>
 #include <chrono>
+
+using std::cout;
+using std::endl;
 
 #define title() do{printf("%s\n", __func__);} while(0)
 /*
@@ -87,9 +91,8 @@ static inline void test_rtree_simd(const size_t num) {
   const auto start = Clock::now();
   struct rtree tree = cuda_create_rtree(points);
   const auto end = Clock::now();
-  const auto elapsed_s = duration_cast<duration<double>>(end - start);
-
-  printf("elapsed: %fs\n", elapsed_s.count());
+  const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  cout << "time (ms): " << elapsed_ms << endl;
 
   if(num < PRINT_CUTOFF) {
     print_points(points);
@@ -108,9 +111,8 @@ static inline void test_rtree_mimd(const size_t num, const size_t threads) {
   const auto start = Clock::now();
   struct rtree tree = cuda_create_rtree_heterogeneously(points, num, threads);
   const auto end = Clock::now();
-  const auto elapsed_s = duration_cast<duration<double>>(end - start);
-
-  printf("elapsed: %fs\n", elapsed_s.count());
+  const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  cout << "time (ms): " << elapsed_ms << endl;
 
   if(num < PRINT_CUTOFF) {
     print_points_together(points, num);
@@ -129,9 +131,8 @@ static inline void test_rtree_sisd(const size_t num) {
   const auto start = Clock::now();
   struct rtree tree = cuda_create_rtree_sisd(points, num);
   const auto end = Clock::now();
-  const auto elapsed_s = duration_cast<duration<double>>(end - start);
-
-  printf("elapsed: %fs\n", elapsed_s.count());
+  const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  cout << "time (ms): " << elapsed_ms << endl;
 
   if(num < PRINT_CUTOFF) {
     print_points_together(points, num);
