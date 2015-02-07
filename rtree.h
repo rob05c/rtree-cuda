@@ -31,16 +31,17 @@ struct rtree_y_key {
 // used for optimal cuda x sorting
 struct rtree_points {
   ord_t* x;
-  struct rtree_y_key* ykey;
+  rtree_y_key* ykey;
   size_t length;
 };
 
 
 #define RTREE_NODE_SIZE 4
 
+struct rtree_node;
 struct rtree {
   size_t depth; // needed to know where the leaves begin
-  struct rtree_node* root;
+  rtree_node* root;
 };
 
 struct rtree_rect {
@@ -51,37 +52,37 @@ struct rtree_rect {
 };
 
 struct rtree_leaf {
-  struct rtree_rect   bounding_box; ///< MUST be first, so leaf boundary can be checked as node
-  size_t              num;
-  struct rtree_point* points;
+  rtree_rect   bounding_box; ///< MUST be first, so leaf boundary can be checked as node
+  size_t       num;
+  rtree_point* points;
 };
 
 struct rtree_node {
-  struct rtree_rect  bounding_box; ///< MUST be first, so leaf boundary can be checked as node
-  size_t             num;
-  struct rtree_node* children;
+  rtree_rect  bounding_box; ///< MUST be first, so leaf boundary can be checked as node
+  size_t      num;
+  rtree_node* children;
 };
 
-void rtree_print_leaves(const struct rtree_leaf* leaves, const size_t len);
-void rtree_print_leaf(const struct rtree_leaf* leaf);
-void rtree_print_point(const struct rtree_point* point);
+void rtree_print_leaves(const rtree_leaf* leaves, const size_t len);
+void rtree_print_leaf(const rtree_leaf* leaf);
+void rtree_print_point(const rtree_point* point);
 
-struct rtree_points cuda_sort(struct rtree_points points);
-struct rtree_leaf* cuda_create_leaves(struct rtree_points sorted);
-struct rtree_node* cuda_create_level(struct rtree_node* nodes, const size_t nodes_len);
-struct rtree cuda_create_rtree(struct rtree_points points);
+rtree_points cuda_sort(rtree_points points);
+rtree_leaf* cuda_create_leaves(rtree_points sorted);
+rtree_node* cuda_create_level(rtree_node* nodes, const size_t nodes_len);
+rtree cuda_create_rtree(rtree_points points);
 
-struct rtree cuda_create_rtree_heterogeneously(struct rtree_point* points, const size_t len, const size_t threads);
-struct rtree_point* tbb_sort(struct rtree_point* points, const size_t len, const size_t threads);
-struct rtree_leaf* cuda_create_leaves_together(struct rtree_point* sorted, const size_t len);
+rtree cuda_create_rtree_heterogeneously(rtree_point* points, const size_t len, const size_t threads);
+rtree_point* tbb_sort(rtree_point* points, const size_t len, const size_t threads);
+rtree_leaf* cuda_create_leaves_together(rtree_point* sorted, const size_t len);
 
-struct rtree cuda_create_rtree_heterogeneously_mergesort(struct rtree_point* points, const size_t len, const size_t threads);
-struct rtree cuda_create_rtree_sisd(struct rtree_point* points, const size_t len);
+rtree cuda_create_rtree_heterogeneously_mergesort(rtree_point* points, const size_t len, const size_t threads);
+rtree cuda_create_rtree_sisd(rtree_point* points, const size_t len);
 
 std::vector<rtree> rtree_create_pipelined(std::vector< std::pair<rtree_point*, size_t> > pointses, const size_t threads);
 
-void rtree_print_rect(struct rtree_rect r);
-void rtree_print_node(struct rtree_node* n, const size_t depth);
-void rtree_print(struct rtree tree);
+void rtree_print_rect(rtree_rect r);
+void rtree_print_node(rtree_node* n, const size_t depth);
+void rtree_print(rtree tree);
 
 #endif

@@ -39,11 +39,11 @@ static inline ord_t uniform_frand(const ord_t min, const ord_t max) {
   return min + r * (max - min);
 }
 
-static inline struct rtree_point* create_points_together(const size_t num) {
+static inline rtree_point* create_points_together(const size_t num) {
   const ord_t min = 0.0f;
   const ord_t max = 100.0f;
 
-  struct rtree_point* points = (rtree_point*) malloc(sizeof(struct rtree_point) * num);
+  rtree_point* points = (rtree_point*) malloc(sizeof(rtree_point) * num);
   for(size_t i = 0, end = num; i != end; ++i) {
     points[i].x = uniform_frand(min, max);
     points[i].y = uniform_frand(min, max);
@@ -52,13 +52,13 @@ static inline struct rtree_point* create_points_together(const size_t num) {
   return points;
 }
 
-static inline struct rtree_points create_points(const size_t num) {
+static inline rtree_points create_points(const size_t num) {
   const ord_t min = 0.0f;
   const ord_t max = 100.0f;
 
   ord_t* x = (ord_t*) malloc(sizeof(ord_t) * num);
-  struct rtree_y_key* ykey = (rtree_y_key*) malloc(sizeof(struct rtree_y_key) * num);
-  struct rtree_points points = {x, ykey, num};
+  rtree_y_key* ykey = (rtree_y_key*) malloc(sizeof(rtree_y_key) * num);
+  rtree_points points = {x, ykey, num};
   for(size_t i = 0, end = num; i != end; ++i) {
     points.x[i] = uniform_frand(min, max);
     points.ykey[i].y = uniform_frand(min, max);
@@ -67,19 +67,19 @@ static inline struct rtree_points create_points(const size_t num) {
   return points;
 }
 
-static inline void destroy_points(struct rtree_points points) {
+static inline void destroy_points(rtree_points points) {
   free(points.x);
   free(points.ykey);
 }
 
-static inline void print_points(struct rtree_points points) {
+static inline void print_points(rtree_points points) {
   printf("x\ty\tkey\n");
   for(size_t i = 0, end = points.length; i != end; ++i)
     printf("%f\t%f\t%d\n", points.x[i], points.ykey[i].y, points.ykey[i].key);
   printf("\n");
 }
 
-static inline void print_points_together(struct rtree_point* points, const size_t len) {
+static inline void print_points_together(rtree_point* points, const size_t len) {
   printf("x\ty\tkey\n");
   for(size_t i = 0, end = len; i != end; ++i)
     printf("%f\t%f\t%d\n", points[i].x, points[i].y, points[i].key);
@@ -91,10 +91,10 @@ static inline void print_points_together(struct rtree_point* points, const size_
 static inline void test_rtree_simd(const size_t num) {
   title();
 
-  struct rtree_points points = create_points(num);
+  rtree_points points = create_points(num);
 
   const auto start = Clock::now();
-  struct rtree tree = cuda_create_rtree(points);
+  rtree tree = cuda_create_rtree(points);
   const auto end = Clock::now();
   const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   cout << "time (ms): " << elapsed_ms << endl;
@@ -111,10 +111,10 @@ static inline void test_rtree_simd(const size_t num) {
 static inline void test_rtree_mimd(const size_t num, const size_t threads) {
   title();
 
-  struct rtree_point* points = create_points_together(num);
+  rtree_point* points = create_points_together(num);
 
   const auto start = Clock::now();
-  struct rtree tree = cuda_create_rtree_heterogeneously(points, num, threads);
+  rtree tree = cuda_create_rtree_heterogeneously(points, num, threads);
   const auto end = Clock::now();
   const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   cout << "time (ms): " << elapsed_ms << endl;
@@ -131,10 +131,10 @@ static inline void test_rtree_mimd(const size_t num, const size_t threads) {
 static inline void test_rtree_sisd(const size_t num) {
   title();
 
-  struct rtree_point* points = create_points_together(num);
+  rtree_point* points = create_points_together(num);
 
   const auto start = Clock::now();
-  struct rtree tree = cuda_create_rtree_sisd(points, num);
+  rtree tree = cuda_create_rtree_sisd(points, num);
   const auto end = Clock::now();
   const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   cout << "time (ms): " << elapsed_ms << endl;
@@ -220,8 +220,8 @@ struct app_arguments {
   size_t      threads;
 };
 
-static struct app_arguments parse_args(const int argc, const char** argv) {
-  struct app_arguments args;
+static app_arguments parse_args(const int argc, const char** argv) {
+  app_arguments args;
   args.success = false;
 
   int arg_i = 0;
@@ -266,7 +266,7 @@ static void print_usage(const char* app_name) {
 int main(const int argc, const char** argv) {
   srand(4242); // seed deterministically, so results are reproducible
 
-  const struct app_arguments args = parse_args(argc, argv);
+  const app_arguments args = parse_args(argc, argv);
   if(!args.success) {
     print_usage(args.app_name);
     return 0;

@@ -11,20 +11,20 @@
 namespace {
 /// \todo put these in a header, so they aren't duplicated
 /// initialize boundary so the first udpate overrides it.
-inline void init_boundary(struct rtree_rect* boundary) {
+inline void init_boundary(rtree_rect* boundary) {
   boundary->top = ord_t_max;
   boundary->bottom = ord_t_lowest;
   boundary->left = ord_t_max;
   boundary->right = ord_t_lowest;
 }
-inline void update_boundary(struct rtree_rect* boundary, struct rtree_point* p) {
+inline void update_boundary(rtree_rect* boundary, rtree_point* p) {
   /// \todo replace these with CUDA min/max which won't use conditionals
   boundary->top = fmin(p->y, boundary->top);
   boundary->bottom = fmax(p->y, boundary->bottom);
   boundary->left = fmin(p->x, boundary->left);
   boundary->right = fmax(p->x, boundary->right);
 }
-inline void update_boundary(struct rtree_rect* boundary, struct rtree_rect* node) {
+inline void update_boundary(rtree_rect* boundary, rtree_rect* node) {
   /// \todo replace these with CUDA min/max which won't use conditionals
   boundary->top = fmin(node->top, boundary->top);
   boundary->bottom = fmax(node->bottom, boundary->bottom);
@@ -38,8 +38,8 @@ static bool operator<(const rtree_point& rhs, const rtree_point& lhs) {
   return rhs.x < lhs.x;
 }
 
-struct rtree_point* tbb_sort(struct rtree_point* points, const size_t len, const size_t threads) {
-//  auto lowxpack = [](const struct rtree_point& rhs, const struct rtree_point& lhs) {
+rtree_point* tbb_sort(rtree_point* points, const size_t len, const size_t threads) {
+//  auto lowxpack = [](const rtree_point& rhs, const rtree_point& lhs) {
 //    return rhs.x < rhs.y;
 //  };
   tbb::task_scheduler_init init(threads);
@@ -48,8 +48,8 @@ struct rtree_point* tbb_sort(struct rtree_point* points, const size_t len, const
 }
 
 /// \param threads the number of threads to use when sorting. ONLY used in the 'sort' part of the algorithm
-struct rtree cuda_create_rtree_heterogeneously_mergesort(struct rtree_point* points, const size_t len, const size_t threads) {
-  struct rtree_leaf* leaves = cuda_create_leaves_together(parallel_mergesort(points, points + len, threads), len);
+rtree cuda_create_rtree_heterogeneously_mergesort(rtree_point* points, const size_t len, const size_t threads) {
+  rtree_leaf* leaves = cuda_create_leaves_together(parallel_mergesort(points, points + len, threads), len);
   const size_t leaves_len = DIV_CEIL(len, RTREE_NODE_SIZE);
 
   rtree_node* previous_level = (rtree_node*) leaves;
@@ -69,14 +69,14 @@ struct rtree cuda_create_rtree_heterogeneously_mergesort(struct rtree_point* poi
     update_boundary(&root->bounding_box, &root->children[i].bounding_box);
   ++depth;
 
-  struct rtree tree = {depth, root};
+  rtree tree = {depth, root};
   return tree;
 }
 
 /// SISD sort via single CPU core (for benchmarks)
-struct rtree cuda_create_rtree_sisd(struct rtree_point* points, const size_t len) {
+rtree cuda_create_rtree_sisd(rtree_point* points, const size_t len) {
   std::sort(points, points + len);
-  struct rtree_leaf* leaves = cuda_create_leaves_together(points, len);
+  rtree_leaf* leaves = cuda_create_leaves_together(points, len);
   const size_t leaves_len = DIV_CEIL(len, RTREE_NODE_SIZE);
 
   rtree_node* previous_level = (rtree_node*) leaves;
@@ -96,6 +96,6 @@ struct rtree cuda_create_rtree_sisd(struct rtree_point* points, const size_t len
     update_boundary(&root->bounding_box, &root->children[i].bounding_box);
   ++depth;
 
-  struct rtree tree = {depth, root};
+  rtree tree = {depth, root};
   return tree;
 }

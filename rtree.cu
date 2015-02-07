@@ -35,7 +35,7 @@ bool rtree_point_less(const rtree_point& rhs, const rtree_point& lhs) {
 /// \todo fix to not be global
 CachingDeviceAllocator g_allocator(true); // CUB caching allocator for device memory
 
-inline void update_boundary(struct rtree_rect* boundary, struct rtree_point* p) {
+inline void update_boundary(rtree_rect* boundary, rtree_point* p) {
   /// \todo replace these with CUDA min/max which won't use conditionals
   boundary->top = fmin(p->y, boundary->top);
   boundary->bottom = fmax(p->y, boundary->bottom);
@@ -43,7 +43,7 @@ inline void update_boundary(struct rtree_rect* boundary, struct rtree_point* p) 
   boundary->right = fmax(p->x, boundary->right);
 }
 
-__device__ void c_update_boundary(struct rtree_rect* boundary, const struct rtree_point* p) {
+__device__ void c_update_boundary(rtree_rect* boundary, const rtree_point* p) {
   /// \todo replace these with CUDA min/max which won't use conditionals
   boundary->top = fminf(p->y, boundary->top);
   boundary->bottom = fmaxf(p->y, boundary->bottom);
@@ -51,7 +51,7 @@ __device__ void c_update_boundary(struct rtree_rect* boundary, const struct rtre
   boundary->right = fmaxf(p->x, boundary->right);
 }
 
-inline void update_boundary(struct rtree_rect* boundary, struct rtree_rect* node) {
+inline void update_boundary(rtree_rect* boundary, rtree_rect* node) {
   /// \todo replace these with CUDA min/max which won't use conditionals
   boundary->top = fmin(node->top, boundary->top);
   boundary->bottom = fmax(node->bottom, boundary->bottom);
@@ -68,7 +68,7 @@ __device__ void c_update_boundary(rtree_rect* boundary, rtree_rect* node) {
 }
 
 /// initialize boundary so the first udpate overrides it.
-inline void init_boundary(struct rtree_rect* boundary) {
+inline void init_boundary(rtree_rect* boundary) {
   boundary->top = ord_t_max;
   boundary->bottom = ord_t_lowest;
   boundary->left = ord_t_max;
@@ -111,8 +111,8 @@ __device__ size_t c_get_node_length(const size_t i, const size_t level_len, cons
   return ((i != final_i || len % n == 0) * n) + ((i == final_i && len % n != 0) * (len % n));
 }
 
-struct rtree cuda_create_rtree_heterogeneously(struct rtree_point* points, const size_t len, const size_t threads) {
-  struct rtree_leaf* leaves = cuda_create_leaves_together(tbb_sort(points, len, threads), len);
+rtree cuda_create_rtree_heterogeneously(rtree_point* points, const size_t len, const size_t threads) {
+  rtree_leaf* leaves = cuda_create_leaves_together(tbb_sort(points, len, threads), len);
   const size_t leaves_len = DIV_CEIL(len, RTREE_NODE_SIZE);
 
   rtree_node* previous_level = (rtree_node*) leaves;
@@ -132,15 +132,15 @@ struct rtree cuda_create_rtree_heterogeneously(struct rtree_point* points, const
     update_boundary(&root->bounding_box, &root->children[i].bounding_box);
   ++depth;
 
-  struct rtree tree = {depth, root};
+  rtree tree = {depth, root};
   return tree;
 }
 
 
 
 
-struct rtree cuda_create_rtree(struct rtree_points points) {
-  struct rtree_leaf* leaves = cuda_create_leaves(cuda_sort(points));
+rtree cuda_create_rtree(rtree_points points) {
+  rtree_leaf* leaves = cuda_create_leaves(cuda_sort(points));
   const size_t leaves_len = DIV_CEIL(points.length, RTREE_NODE_SIZE);
 
   rtree_node* previous_level = (rtree_node*) leaves;
@@ -160,7 +160,7 @@ struct rtree cuda_create_rtree(struct rtree_points points) {
     update_boundary(&root->bounding_box, &root->children[i].bounding_box);
   ++depth;
 
-  struct rtree tree = {depth, root};
+  rtree tree = {depth, root};
   return tree;
 }
 
@@ -184,7 +184,7 @@ __global__ void create_level_kernel(rtree_node* next_level, rtree_node* nodes, r
 
 /// \param nodes Can really be either a rtree_node or rtree_leaf; doesn't matter to us, we won't dereference .children
 /// \return next level up. Length is ceil(nodes_len / RTREE_NODE_SIZE)
-struct rtree_node* cuda_create_level(struct rtree_node* nodes, const size_t nodes_len) {
+rtree_node* cuda_create_level(rtree_node* nodes, const size_t nodes_len) {
   const size_t THREADS_PER_BLOCK = 512;
   const size_t next_level_len = DIV_CEIL(nodes_len, RTREE_NODE_SIZE);
 
@@ -229,7 +229,7 @@ __global__ void create_leaves_together_kernel(rtree_leaf* leaves, rtree_point* p
   }
 }
 
-struct rtree_leaf* cuda_create_leaves_together(struct rtree_point* sorted, const size_t len) {
+rtree_leaf* cuda_create_leaves_together(rtree_point* sorted, const size_t len) {
 //  static_assert(sizeof(rtree_node) == sizeof(rtree_leaf), "rtree node, leaf sizes must be equal, since leaves are passed to create_level");
 
   const size_t THREADS_PER_BLOCK = 512;
@@ -282,7 +282,7 @@ __global__ void create_leaves_kernel(rtree_leaf* leaves, rtree_point* points, rt
 }
 
 /// \todo make CUDA
-struct rtree_leaf* cuda_create_leaves(struct rtree_points sorted) {
+rtree_leaf* cuda_create_leaves(rtree_points sorted) {
 //  static_assert(sizeof(rtree_node) == sizeof(rtree_leaf), "rtree node, leaf sizes must be equal, since leaves are passed to create_level");
 
   const size_t THREADS_PER_BLOCK = 512;
@@ -302,7 +302,7 @@ struct rtree_leaf* cuda_create_leaves(struct rtree_points sorted) {
   cudaMalloc((void**)&cuda_ykey,   sorted.length * sizeof(rtree_y_key));
 
   cudaMemcpy(cuda_x,    sorted.x,    sorted.length * sizeof(ord_t),       cudaMemcpyHostToDevice);
-  cudaMemcpy(cuda_ykey, sorted.ykey, sorted.length * sizeof(struct rtree_y_key), cudaMemcpyHostToDevice);
+  cudaMemcpy(cuda_ykey, sorted.ykey, sorted.length * sizeof(rtree_y_key), cudaMemcpyHostToDevice);
 
   rtree_point* points = (rtree_point*) malloc(sizeof(rtree_point) * sorted.length);
 
@@ -326,9 +326,9 @@ struct rtree_leaf* cuda_create_leaves(struct rtree_points sorted) {
 }
 
 
-struct rtree_points cuda_sort(struct rtree_points points) {
+rtree_points cuda_sort(rtree_points points) {
   typedef ord_t key_t;
-  typedef struct rtree_y_key value_t;
+  typedef rtree_y_key value_t;
   DoubleBuffer<key_t> d_keys;
   DoubleBuffer<value_t> d_values;
   CubDebugExit( g_allocator.DeviceAllocate((void**)&d_keys.d_buffers[0], sizeof(key_t) * points.length));
@@ -358,7 +358,7 @@ struct rtree_points cuda_sort(struct rtree_points points) {
   return points;
 }
 
-static rtree cuda_create_rtree_from_sorted(struct rtree_point* points, const size_t len) {
+static rtree cuda_create_rtree_from_sorted(rtree_point* points, const size_t len) {
   rtree_leaf* leaves = cuda_create_leaves_together(points, len);
   const size_t leaves_len = DIV_CEIL(len, RTREE_NODE_SIZE);
 

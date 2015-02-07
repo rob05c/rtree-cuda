@@ -4,15 +4,15 @@
 #include <stdio.h>
 #include <stdint.h>
 
-inline void rtree_print_point(const struct rtree_point* point) {
+inline void rtree_print_point(const rtree_point* point) {
   printf("[%f,%f,%d]", point->x, point->y, point->key);
 }
 
-inline void rtree_print_rect(struct rtree_rect r) {
+inline void rtree_print_rect(rtree_rect r) {
   printf("[%f,%f,%f,%f]", r.top, r.left, r.bottom, r.right);
 }
 
-void rtree_print_leaf(const struct rtree_leaf* leaf) {
+void rtree_print_leaf(const rtree_leaf* leaf) {
   printf("{\"bounding-box\":");
   rtree_print_rect(leaf->bounding_box);
   printf(", \"points\":[");
@@ -25,7 +25,7 @@ void rtree_print_leaf(const struct rtree_leaf* leaf) {
   printf("]}");
 }
 
-void rtree_print_leaves(const struct rtree_leaf* leaves, const size_t len) {
+void rtree_print_leaves(const rtree_leaf* leaves, const size_t len) {
   printf("[\n");
   for(size_t i = 0, end = len; i != end; ++i) {
     rtree_print_leaf(&leaves[i]);
@@ -35,9 +35,9 @@ void rtree_print_leaves(const struct rtree_leaf* leaves, const size_t len) {
   printf("\n]\n");
 }
 
-void rtree_print_node(struct rtree_node* n, size_t depth) {
+void rtree_print_node(rtree_node* n, size_t depth) {
   if(depth == 0) {
-    rtree_print_leaf((struct rtree_leaf*)n);
+    rtree_print_leaf((rtree_leaf*)n);
     return;
   }
 
@@ -57,7 +57,7 @@ void rtree_print_node(struct rtree_node* n, size_t depth) {
   printf("]}");
 }
 
-void rtree_print(struct rtree tree) {
+void rtree_print(rtree tree) {
   rtree_print_node(tree.root, tree.depth - 1);
   printf("\n");
 }
