@@ -61,7 +61,7 @@ rtree cuda_create_rtree_heterogeneously_mergesort(rtree_point* points, const siz
     ++depth;
   }
 
-  rtree_node* root = (rtree_node*) malloc(sizeof(rtree_node));
+  rtree_node* root = new rtree_node();
   init_boundary(&root->bounding_box);
   root->num = previous_len;
   root->children = previous_level;
@@ -88,7 +88,7 @@ rtree cuda_create_rtree_sisd(rtree_point* points, const size_t len) {
     ++depth;
   }
 
-  rtree_node* root = (rtree_node*) malloc(sizeof(rtree_node));
+  rtree_node* root = new rtree_node();
   init_boundary(&root->bounding_box);
   root->num = previous_len;
   root->children = previous_level;

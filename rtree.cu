@@ -124,7 +124,7 @@ rtree cuda_create_rtree_heterogeneously(rtree_point* points, const size_t len, c
     ++depth;
   }
 
-  rtree_node* root = (rtree_node*) malloc(sizeof(rtree_node));
+  rtree_node* root = new rtree_node();
   init_boundary(&root->bounding_box);
   root->num = previous_len;
   root->children = previous_level;
@@ -152,7 +152,7 @@ rtree cuda_create_rtree(rtree_points points) {
     ++depth;
   }
 
-  rtree_node* root = (rtree_node*) malloc(sizeof(rtree_node));
+  rtree_node* root = new rtree_node();
   init_boundary(&root->bounding_box);
   root->num = previous_len;
   root->children = previous_level;
@@ -199,7 +199,7 @@ rtree_node* cuda_create_level(rtree_node* nodes, const size_t nodes_len) {
 
   create_level_kernel<<<(next_level_len + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(cuda_next_level, cuda_nodes, nodes, nodes_len);
 
-  rtree_node* next_level = (rtree_node*) malloc(sizeof(rtree_node) * next_level_len);
+  rtree_node* next_level = new rtree_node[next_level_len];
   cudaMemcpy(next_level, cuda_next_level, next_level_len * sizeof(rtree_node), cudaMemcpyDeviceToHost);
 
   cudaFree(cuda_next_level);
@@ -246,7 +246,7 @@ rtree_leaf* cuda_create_leaves_together(rtree_point* sorted, const size_t len) {
 
   create_leaves_together_kernel<<<(leaves_num + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(cuda_leaves, cuda_points, sorted, len);
 
-  rtree_leaf* leaves = (rtree_leaf*) malloc(sizeof(rtree_leaf) * leaves_num);
+  rtree_leaf* leaves = new rtree_leaf[leaves_num];
 
   cudaMemcpy(leaves, cuda_leaves, leaves_num * sizeof(rtree_leaf), cudaMemcpyDeviceToHost);
 
@@ -304,11 +304,11 @@ rtree_leaf* cuda_create_leaves(rtree_points sorted) {
   cudaMemcpy(cuda_x,    sorted.x,    sorted.length * sizeof(ord_t),       cudaMemcpyHostToDevice);
   cudaMemcpy(cuda_ykey, sorted.ykey, sorted.length * sizeof(rtree_y_key), cudaMemcpyHostToDevice);
 
-  rtree_point* points = (rtree_point*) malloc(sizeof(rtree_point) * sorted.length);
+  rtree_point* points = new rtree_point[sorted.length];
 
   create_leaves_kernel<<<(leaves_num + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(cuda_leaves, cuda_points, points, cuda_x, cuda_ykey, len);
 
-  rtree_leaf*  leaves = (rtree_leaf*)  malloc(sizeof(rtree_leaf) * leaves_num);
+  rtree_leaf*  leaves = new rtree_leaf[leaves_num];
 
 
   cudaMemcpy(leaves, cuda_leaves, leaves_num    * sizeof(rtree_leaf), cudaMemcpyDeviceToHost);
@@ -371,7 +371,7 @@ static rtree cuda_create_rtree_from_sorted(rtree_point* points, const size_t len
     ++depth;
   }
 
-  rtree_node* root = (rtree_node*) malloc(sizeof(rtree_node));
+  rtree_node* root = new rtree_node();
   init_boundary(&root->bounding_box);
   root->num = previous_len;
   root->children = previous_level;

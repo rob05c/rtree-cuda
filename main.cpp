@@ -43,7 +43,7 @@ static inline rtree_point* create_points_together(const size_t num) {
   const ord_t min = 0.0f;
   const ord_t max = 100.0f;
 
-  rtree_point* points = (rtree_point*) malloc(sizeof(rtree_point) * num);
+  rtree_point* points = new rtree_point[num];
   for(size_t i = 0, end = num; i != end; ++i) {
     points[i].x = uniform_frand(min, max);
     points[i].y = uniform_frand(min, max);
@@ -56,8 +56,8 @@ static inline rtree_points create_points(const size_t num) {
   const ord_t min = 0.0f;
   const ord_t max = 100.0f;
 
-  ord_t* x = (ord_t*) malloc(sizeof(ord_t) * num);
-  rtree_y_key* ykey = (rtree_y_key*) malloc(sizeof(rtree_y_key) * num);
+  ord_t* x = new ord_t[num];
+  rtree_y_key* ykey = new rtree_y_key[num];
   rtree_points points = {x, ykey, num};
   for(size_t i = 0, end = num; i != end; ++i) {
     points.x[i] = uniform_frand(min, max);
@@ -68,8 +68,8 @@ static inline rtree_points create_points(const size_t num) {
 }
 
 static inline void destroy_points(rtree_points points) {
-  free(points.x);
-  free(points.ykey);
+  delete[] points.x;
+  delete[] points.ykey;
 }
 
 static inline void print_points(rtree_points points) {
@@ -124,7 +124,7 @@ static inline void test_rtree_mimd(const size_t num, const size_t threads) {
     rtree_print(tree);
   }
 
-  free(points);
+  delete[] points;
 }
 
 /// SISD sort (single core CPU via std::sort)
@@ -144,7 +144,7 @@ static inline void test_rtree_sisd(const size_t num) {
     rtree_print(tree);
   }
 
-  free(points);
+  delete[] points;
 }
 
 
@@ -176,7 +176,7 @@ static inline void test_pipelined(const size_t len, const size_t threads) {
   printf("ms per point: %f\n", (double)elapsed_ms / len);
 
   for(int i = 0, end = PIPELINE_LEN; i != end; ++i)
-    free(pointses[i].first);
+    delete[] pointses[i].first;
 }
 
 static inline void test_unpipelined(const size_t len, const size_t threads) {
@@ -209,7 +209,7 @@ static inline void test_unpipelined(const size_t len, const size_t threads) {
   printf("ms per point: %f\n", (double)elapsed_ms / len);
 
   for(int i = 0, end = PIPELINE_LEN; i != end; ++i)
-    free(pointses[i].first);
+    delete[] pointses[i].first;
 }
 
 struct app_arguments {
