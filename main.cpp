@@ -6,7 +6,12 @@
 #include <string.h>
 #include <iostream>
 #include <chrono>
+#include <vector>
+#include <utility>
 
+using std::vector;
+using std::pair;
+using std::make_pair;
 using std::cout;
 using std::endl;
 
@@ -142,6 +147,71 @@ static inline void test_rtree_sisd(const size_t num) {
   free(points);
 }
 
+
+static inline void test_pipelined(const size_t len, const size_t threads) {
+  title();
+  const size_t PIPELINE_LEN = 10;
+
+  printf("creating points...\n");
+  rtree_point* points = create_points_together(len);
+  printf("points: %lu\n", len);
+
+  vector<pair<rtree_point*, size_t>> pointses;
+  pointses.push_back(make_pair(points, len));
+  for(size_t i = 0, end = PIPELINE_LEN; i != end; ++i) {
+    rtree_point* morepoints = new rtree_point[len];
+    memcpy(morepoints, points, len * sizeof(rtree_point));
+    pointses.push_back(make_pair(morepoints, len));
+  }
+
+  cout << "creating tree..." << endl;
+
+  const auto start = std::chrono::high_resolution_clock::now();
+
+  vector<rtree> trees = rtree_create_pipelined(pointses, threads);
+
+  const auto end = std::chrono::high_resolution_clock::now();
+  const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  std::cout << "cpu time (ms): " << elapsed_ms << std::endl;
+  printf("ms per point: %f\n", (double)elapsed_ms / len);
+
+  for(int i = 0, end = PIPELINE_LEN; i != end; ++i)
+    free(pointses[i].first);
+}
+
+static inline void test_unpipelined(const size_t len, const size_t threads) {
+  const size_t PIPELINE_LEN = 10;
+  printf("test_unpipelined\n");
+  printf("creating points...\n");
+  rtree_point* points = create_points_together(len);
+  printf("points: %lu\n", len);
+
+  vector<pair<rtree_point*, size_t>> pointses;
+  pointses.push_back(make_pair(points, len));
+  for(size_t i = 0, end = PIPELINE_LEN; i != end; ++i) {
+    rtree_point* morepoints = new rtree_point[len];
+    memcpy(morepoints, points, len * sizeof(rtree_point));
+    pointses.push_back(make_pair(morepoints, len));
+  }
+
+  cout << "creating tree..." << endl;
+
+  const auto start = std::chrono::high_resolution_clock::now();
+
+  vector<rtree> trees;
+  for(size_t i = 0, end = PIPELINE_LEN;i != end; ++i) {
+    trees.push_back(cuda_create_rtree_heterogeneously(pointses[i].first, pointses[i].second, threads));
+  }
+
+  const auto end = std::chrono::high_resolution_clock::now();
+  const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  std::cout << "cpu time (ms): " << elapsed_ms << std::endl;
+  printf("ms per point: %f\n", (double)elapsed_ms / len);
+
+  for(int i = 0, end = PIPELINE_LEN; i != end; ++i)
+    free(pointses[i].first);
+}
+
 struct app_arguments {
   bool        success;
   const char* app_name;
@@ -170,7 +240,7 @@ static struct app_arguments parse_args(const int argc, const char** argv) {
   args.array_size = strtol(argv[arg_i], NULL, 10);
   ++arg_i;
 
-  if(args.test_num == 1) {
+  if(args.test_num == 1 || args.test_num > 2) {
     if(argc <= arg_i)
       return args;
     args.threads = strtol(argv[arg_i], NULL, 10);
@@ -185,8 +255,10 @@ static void print_usage(const char* app_name) {
   const char* default_app_name = "rtree";
   printf("usage: %s test_num array_size threads\n", strlen(app_name) == 0 ? default_app_name : app_name);
   printf("       test 0: CUDA construction\n");
-  printf("       test 1: heterogeneous CUDA+TBB construction\n");
+  printf("       test 1: heterogeneous CUDA+MIMD construction\n");
   printf("       test 2: serial sort with CUDA construction\n");
+  printf("       test 3: pipelined heterogeneous construction x10\n");
+  printf("       test 4: unpipelined heterogeneous construction x10\n");
   printf(" *threads is ONLY used for test 1, and then only for the MIMD sort. 2xCores is generally good.\n");
   printf("\n");
 }
@@ -206,6 +278,10 @@ int main(const int argc, const char** argv) {
     test_rtree_mimd(args.array_size, args.threads);
   else if(args.test_num == 2)
     test_rtree_sisd(args.array_size);
+  else if(args.test_num == 3)
+    test_pipelined(args.array_size, args.threads);
+  else if(args.test_num == 4)
+    test_unpipelined(args.array_size, args.threads);
 
   printf("\n");
   return 0;

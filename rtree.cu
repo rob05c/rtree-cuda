@@ -6,12 +6,26 @@
 #include <stdlib.h>    
 #include <assert.h>
 #include <math.h>
+#include <vector>
+#include <utility>
+#include <future>
 #include <linux/cuda.h>
 #include <cub/cub.cuh>
 #include <cub/util_allocator.cuh>
 #include <cub/device/device_radix_sort.cuh>
+#include "tbb/tbb.h"
+#include "mergesort.hh"
 
+using std::vector;
+using std::pair;
+using std::promise;
+using std::future;
 using namespace cub; // debug
+
+// x value ALONE is used for comparison, to create an xpack
+bool operator<(const rtree_point& rhs, const rtree_point& lhs) {
+  return rhs.x < lhs.x;
+}
 
 // x value ALONE is used for comparison, to create an xpack
 bool rtree_point_less(const rtree_point& rhs, const rtree_point& lhs) {
@@ -342,4 +356,53 @@ struct rtree_points cuda_sort(struct rtree_points points) {
   CubDebugExit( g_allocator.DeviceFree(d_temp_storage));
 
   return points;
+}
+
+static rtree cuda_create_rtree_from_sorted(struct rtree_point* points, const size_t len) {
+  rtree_leaf* leaves = cuda_create_leaves_together(points, len);
+  const size_t leaves_len = DIV_CEIL(len, RTREE_NODE_SIZE);
+
+  rtree_node* previous_level = (rtree_node*) leaves;
+  size_t      previous_len = leaves_len;
+  size_t      depth = 1; // leaf level is 0
+  while(previous_len > RTREE_NODE_SIZE) {
+    previous_level = cuda_create_level(previous_level, previous_len);
+    previous_len = DIV_CEIL(previous_len, RTREE_NODE_SIZE);
+    ++depth;
+  }
+
+  rtree_node* root = (rtree_node*) malloc(sizeof(rtree_node));
+  init_boundary(&root->bounding_box);
+  root->num = previous_len;
+  root->children = previous_level;
+  for(size_t i = 0, end = previous_len; i != end; ++i)
+    update_boundary(&root->bounding_box, &root->children[i].bounding_box);
+  ++depth;
+
+  rtree tree = {depth, root};
+  return tree;
+}
+
+vector<rtree> rtree_create_pipelined(vector< pair<rtree_point*, size_t> > pointses, const size_t threads) {
+  vector<promise<bool>> promises(pointses.size());
+  vector<future<bool>> futures;
+  for(vector<promise<bool>>::iterator i = promises.begin(), end = promises.end(); i != end; ++i)
+    futures.push_back(i->get_future());
+
+  vector<rtree> trees;
+
+  tbb::task_group tasks;
+  tasks.run([&]{
+      for(size_t i = 0, end = futures.size(); i != end; ++i) {
+        futures[i].wait();
+        trees.push_back(cuda_create_rtree_from_sorted(pointses[i].first, pointses[i].second));
+      }
+    });
+
+  for(size_t i = 0, end =  pointses.size(); i != end; ++i) {
+    parallel_mergesort(pointses[i].first, pointses[i].first + pointses[i].second, threads);
+    promises[i].set_value(true);
+  }
+  tasks.wait();
+  return trees;
 }

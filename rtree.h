@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <limits.h>
 #include <float.h>
+#include <vector>
+#include <utility>
 
 // efficient ceil((float)a/(float)b)
 #define DIV_CEIL(x, y) (((x) + (y) - 1) / (y))
@@ -75,6 +77,8 @@ struct rtree_leaf* cuda_create_leaves_together(struct rtree_point* sorted, const
 
 struct rtree cuda_create_rtree_heterogeneously_mergesort(struct rtree_point* points, const size_t len, const size_t threads);
 struct rtree cuda_create_rtree_sisd(struct rtree_point* points, const size_t len);
+
+std::vector<rtree> rtree_create_pipelined(std::vector< std::pair<rtree_point*, size_t> > pointses, const size_t threads);
 
 void rtree_print_rect(struct rtree_rect r);
 void rtree_print_node(struct rtree_node* n, const size_t depth);

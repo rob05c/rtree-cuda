@@ -34,7 +34,7 @@ inline void update_boundary(struct rtree_rect* boundary, struct rtree_rect* node
 } // namespace
 
 // x value ALONE is used for comparison, to create an xpack
-bool operator<(const rtree_point& rhs, const rtree_point& lhs) {
+static bool operator<(const rtree_point& rhs, const rtree_point& lhs) {
   return rhs.x < lhs.x;
 }
 
