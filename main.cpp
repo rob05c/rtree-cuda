@@ -179,9 +179,9 @@ static inline void test_pipelined(const size_t len, const size_t threads) {
     delete[] pointses[i].first;
 }
 
-static inline void test_unpipelined(const size_t len, const size_t threads) {
+static inline void test_unpipelined_heterogeneous(const size_t len, const size_t threads) {
   const size_t PIPELINE_LEN = 10;
-  printf("test_unpipelined\n");
+  printf("test_unpipelined_heterogeneous\n");
   printf("creating points...\n");
   rtree_point* points = create_points_together(len);
   printf("points: %lu\n", len);
@@ -210,6 +210,40 @@ static inline void test_unpipelined(const size_t len, const size_t threads) {
 
   for(int i = 0, end = PIPELINE_LEN; i != end; ++i)
     delete[] pointses[i].first;
+}
+
+static inline void test_unpipelined_cuda(const size_t len, const size_t threads) {
+  const size_t PIPELINE_LEN = 10;
+  printf("test_unpipelined_cuda\n");
+  printf("creating points...\n");
+  rtree_points points = create_points(len);
+  printf("points: %lu\n", len);
+
+  vector<rtree_points> pointses;
+  pointses.push_back(points);
+  for(size_t i = 0, end = PIPELINE_LEN; i != end; ++i) {
+    rtree_points morepoints = {new ord_t[len], new rtree_y_key[len], len};
+    memcpy(morepoints.x, points.x, len * sizeof(ord_t));
+    memcpy(morepoints.ykey, points.ykey, len * sizeof(rtree_y_key));
+    pointses.push_back(morepoints);
+  }
+
+  cout << "creating tree..." << endl;
+
+  const auto start = std::chrono::high_resolution_clock::now();
+
+  vector<rtree> trees;
+  for(size_t i = 0, end = PIPELINE_LEN;i != end; ++i) {
+    trees.push_back(cuda_create_rtree(pointses[i]));
+  }
+
+  const auto end = std::chrono::high_resolution_clock::now();
+  const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  std::cout << "cpu time (ms): " << elapsed_ms << std::endl;
+  printf("ms per point: %f\n", (double)elapsed_ms / len);
+
+  for(int i = 0, end = PIPELINE_LEN; i != end; ++i)
+    destroy_points(pointses[i]);
 }
 
 struct app_arguments {
@@ -259,6 +293,7 @@ static void print_usage(const char* app_name) {
   printf("       test 2: serial sort with CUDA construction\n");
   printf("       test 3: pipelined heterogeneous construction x10\n");
   printf("       test 4: unpipelined heterogeneous construction x10\n");
+  printf("       test 5: unpipelined CUDA construction x10\n");  
   printf(" *threads is ONLY used for test 1, and then only for the MIMD sort. 2xCores is generally good.\n");
   printf("\n");
 }
@@ -281,7 +316,9 @@ int main(const int argc, const char** argv) {
   else if(args.test_num == 3)
     test_pipelined(args.array_size, args.threads);
   else if(args.test_num == 4)
-    test_unpipelined(args.array_size, args.threads);
+    test_unpipelined_heterogeneous(args.array_size, args.threads);
+  else if(args.test_num == 5)
+    test_unpipelined_cuda(args.array_size, args.threads);
 
   printf("\n");
   return 0;
